@@ -51,7 +51,7 @@ export const ChatWindow = ({
           "& pre": {
             bgcolor: "rgba(0, 0, 0, 0.04)",
             p: 3,
-            borderRadius: 8,
+            borderRadius: 1,
             overflowX: "auto",
             border: "1px solid rgba(0, 0, 0, 0.05)",
           },
@@ -59,7 +59,6 @@ export const ChatWindow = ({
             bgcolor: "rgba(0, 0, 0, 0.05)",
             px: 0.6,
             py: 0.2,
-            borderRadius: 1,
           },
         },
       }}
