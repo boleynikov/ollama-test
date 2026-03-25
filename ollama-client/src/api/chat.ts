@@ -26,4 +26,12 @@ export const chatApi = {
     fetch("http://localhost:5262/api/Ollama/local-models").then((res) =>
       res.json(),
     ),
+
+  deleteChat: (chatId: string) =>
+    fetch(`${API_BASE}/${chatId}`, {
+      method: "DELETE",
+    }).then((res) => {
+      if (!res.ok) throw new Error("Failed to delete chat");
+      return res;
+    }),
 };

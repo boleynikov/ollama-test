@@ -24,7 +24,7 @@ export const GlobalStyles = () => {
             height: "100%",
             width: "100%",
             overflow: "hidden", // Запобігаємо двійним скролбарам на macOS
-            backgroundColor: theme.palette.background.default,
+            // backgroundColor: theme.palette.background.default,
             WebkitFontSmoothing: "antialiased",
             MozOsxFontSmoothing: "grayscale",
             transition: "background-color 0.3s ease", // Плавна зміна теми

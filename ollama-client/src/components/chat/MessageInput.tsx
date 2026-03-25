@@ -32,11 +32,6 @@ export const MessageInput = ({ onSend, disabled }: MessageInputProps) => {
         p: theme.spacing(3), // Spacing Token: Space-3
         display: "flex",
         alignItems: "flex-end", // Для коректного вирівнювання при multiline
-
-        // macOS Glassmorphism Integration
-        bgcolor: alpha(theme.palette.background.paper, 0.7),
-        backdropFilter: "blur(20px)",
-
         borderBottomLeftRadius: theme.shape.borderRadius,
         borderBottomRightRadius: theme.shape.borderRadius,
       }}

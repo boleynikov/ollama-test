@@ -1,4 +1,5 @@
 export type Message = {
+  id?: string | number;
   role: "user" | "assistant";
   content: string;
   thinking?: string;

@@ -19,13 +19,13 @@ export const PersonaSelector = ({ selected, onSelect, disabled }: Props) => {
     <Box
       sx={{
         px: theme.spacing(4), // Використання Space-4 Token
-        py: theme.spacing(2),
+        pt: theme.spacing(2),
 
         // macOS Glassmorphism System
-        bgcolor: alpha(theme.palette.background.paper, 0.7),
-        backdropFilter: "blur(20px)", // Ефект розмиття фону для візуальної легкості
+        // bgcolor: alpha(theme.palette.background.paper, 0.4),
+        // backdropFilter: "blur(3px)",
 
-        borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+        // borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
         overflow: "visible",
       }}
     >
