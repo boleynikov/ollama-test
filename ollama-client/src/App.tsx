@@ -13,7 +13,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
 import { MessageInput } from "./components/chat/MessageInput";
 import { PersonaSelector } from "./components/chat/PersonaSelector";
-import { ModelSelector, type ModelType } from "./components/chat/ModelSelector";
+import { ModelSelector } from "./components/chat/ModelSelector";
 import { SettingsMenu } from "./components/chat/SettingsMenu";
 import { getMacTheme, type ThemeColor } from "./theme";
 import { useLocalStorage } from "./hooks/useLocalStorage";
@@ -21,6 +21,7 @@ import { useLocalStorage } from "./hooks/useLocalStorage";
 import { PERSONAS, type Chat, type Message, type PersonaType } from "./types";
 import { chatApi } from "./api/chat";
 import { streamOllama } from "./api/ollama";
+import { GlobalStyles } from "./theme/GlobalStyles";
 
 /**
  * UI Designer: Multi-Chat macOS Workspace
@@ -33,7 +34,7 @@ function App() {
     "app-theme",
     "blue",
   );
-  const [currentModel, setCurrentModel] = useLocalStorage<ModelType>(
+  const [currentModel, setCurrentModel] = useLocalStorage<string>(
     "app-model",
     "gemma3:12b",
   );
@@ -48,6 +49,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [currentPersona, setCurrentPersona] = useState<PersonaType>("Thinking");
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
 
   const theme = useMemo(() => getMacTheme(themeMode), [themeMode]);
   const activePersonaConfig = useMemo(
@@ -75,6 +78,22 @@ function App() {
       setMessages([]);
     }
   }, [activeChatId]);
+
+  useEffect(() => {
+    chatApi
+      .getLocalModels()
+      .then((models) => {
+        setAvailableModels(models);
+        // Якщо поточна модель не встановлена або її немає в списку — беремо першу доступну
+        if (
+          models.length > 0 &&
+          (!currentModel || !models.includes(currentModel))
+        ) {
+          setCurrentModel(models[0]);
+        }
+      })
+      .finally(() => setModelsLoading(false));
+  }, []);
 
   // --- Handlers ---
 
@@ -144,7 +163,7 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
+      <GlobalStyles />
       <Box
         sx={{
           display: "flex",
@@ -198,8 +217,10 @@ function App() {
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <ModelSelector
                   value={currentModel}
+                  models={availableModels}
                   onChange={setCurrentModel}
                   disabled={loading}
+                  loading={modelsLoading}
                 />
                 <SettingsMenu
                   currentTheme={themeMode}

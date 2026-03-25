@@ -15,7 +15,7 @@ import AddIcon from "@mui/icons-material/Add";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import { useState } from "react";
-import type { Chat } from "../../types";
+import type { Chat } from "../types";
 
 /**
  * UI Designer: macOS Sidebar with High-Contrast Gradient Support

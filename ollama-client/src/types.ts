@@ -1,5 +1,3 @@
-import type { ModelType } from "./components/chat/ModelSelector";
-
 export type Message = {
   role: "user" | "assistant";
   content: string;
@@ -14,7 +12,7 @@ export type OllamaChunk = {
 export interface Chat {
   id: string;
   title: string;
-  model: ModelType; // Використовуємо суворий тип замість просто string
+  model: string;
   persona: PersonaType;
   createdAt: string; // DateTime -> ISO string
 

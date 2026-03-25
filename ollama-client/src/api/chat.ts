@@ -21,4 +21,9 @@ export const chatApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: newTitle }),
     }).then((res) => res.json()),
+
+  getLocalModels: (): Promise<string[]> =>
+    fetch("http://localhost:5262/api/Ollama/local-models").then((res) =>
+      res.json(),
+    ),
 };

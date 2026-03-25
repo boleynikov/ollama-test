@@ -3,23 +3,42 @@ import {
   ToggleButtonGroup,
   alpha,
   useTheme,
+  Skeleton,
 } from "@mui/material";
 
 /**
- * UI Designer: Model Selector (Segmented Control)
- * Створено для чіткої візуальної ієрархії в шапці
+ * UI Designer: Dynamic Model Selector
+ * Тепер автоматично будує інтерфейс на основі доступних в Ollama моделей
  */
 
-export type ModelType = "llama3.1:8b" | "gemma3:12b";
-
 interface Props {
-  value: ModelType;
-  onChange: (model: ModelType) => void;
+  value: string; // Тепер просто string, бо моделі динамічні
+  models: string[]; // Список моделей з бекенду
+  onChange: (model: string) => void;
   disabled: boolean;
+  loading?: boolean;
 }
 
-export const ModelSelector = ({ value, onChange, disabled }: Props) => {
+export const ModelSelector = ({
+  value,
+  models,
+  onChange,
+  disabled,
+  loading,
+}: Props) => {
   const theme = useTheme();
+
+  // Якщо моделі ще вантажаться, показуємо "скелетон" у стилі macOS
+  if (loading && models.length === 0) {
+    return (
+      <Skeleton
+        variant="rounded"
+        width={200}
+        height={32}
+        sx={{ borderRadius: "8px" }}
+      />
+    );
+  }
 
   return (
     <ToggleButtonGroup
@@ -38,23 +57,28 @@ export const ModelSelector = ({ value, onChange, disabled }: Props) => {
           py: 0.5,
           borderRadius: "6px !important",
           border: "none",
-          fontSize: "0.75rem",
+          fontSize: "0.72rem", // Трохи менший шрифт для довгих назв
           fontWeight: 600,
           color: "text.secondary",
-          textTransform: "none",
-          transition: "all 150ms ease", // Transition Fast
+          textTransform: "uppercase", // Apple Style для тех-параметрів
+          letterSpacing: "0.02em",
+          transition: "all 150ms ease",
 
           "&.Mui-selected": {
             bgcolor: "background.paper",
             color: "text.primary",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.08)", // Shadow SM
+            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
             "&:hover": { bgcolor: "background.paper" },
           },
         },
       }}
     >
-      <ToggleButton value="llama3.1:8b">Llama 3.1</ToggleButton>
-      <ToggleButton value="gemma3:12b">Gemma 3</ToggleButton>
+      {models.map((modelName) => (
+        <ToggleButton key={modelName} value={modelName}>
+          {/* Вирізаємо ":latest" для чистоти UI, якщо воно є */}
+          {modelName.replace(":latest", "")}
+        </ToggleButton>
+      ))}
     </ToggleButtonGroup>
   );
 };
