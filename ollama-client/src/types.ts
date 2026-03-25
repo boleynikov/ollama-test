@@ -1,3 +1,5 @@
+import type { ModelType } from "./components/chat/ModelSelector";
+
 export type Message = {
   role: "user" | "assistant";
   content: string;
@@ -8,6 +10,20 @@ export type OllamaChunk = {
   done: boolean;
   context?: number[];
 };
+
+export interface Chat {
+  id: string;
+  title: string;
+  model: ModelType; // Використовуємо суворий тип замість просто string
+  persona: PersonaType;
+  createdAt: string; // DateTime -> ISO string
+
+  /**
+   * Навігаційна властивість: Масив повідомлень.
+   * Опціонально, бо при завантаженні списку для Sidebar ми можемо їх не тягнути
+   */
+  messages?: Message[];
+}
 
 export type PersonaType =
   | "Thinking"

@@ -46,7 +46,7 @@ export const TypingIndicator = () => {
           <motion.div
             key={i}
             custom={i}
-            variants={dotVariants}
+            variants={dotVariants as unknown as any}
             animate="animate"
             style={{
               width: 6,
