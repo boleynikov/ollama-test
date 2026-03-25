@@ -106,7 +106,7 @@ export const Sidebar = ({
               whiteSpace: "nowrap",
             }}
           >
-            ІСТОРІЯ ЧАТІВ
+            Про що ми балакали
           </Typography>
         )}
 

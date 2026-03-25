@@ -1,6 +1,7 @@
 export type Message = {
   role: "user" | "assistant";
   content: string;
+  thinking?: string;
 };
 
 export type OllamaChunk = {

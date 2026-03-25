@@ -1,7 +1,6 @@
 import {
   Box,
   ThemeProvider,
-  CssBaseline,
   Container,
   AppBar,
   Toolbar,
@@ -134,25 +133,40 @@ function App() {
     setIsTyping(true);
 
     let fullAiResponse = "";
+    let fullAiThinking = "";
     let aiMessageStarted = false;
 
     // Виклик бекенду (який сам збереже повідомлення в БД)
     await streamOllama(
-      [...messages, userMsg], // Передаємо історію + нове повідомлення
+      [...messages, userMsg],
       activePersonaConfig,
       currentModel,
-      activeChatId, // Передаємо ID чату для збереження на бекенді
-      (chunk) => {
+      activeChatId,
+      ({ content, thinking }) => {
         if (!aiMessageStarted) {
-          setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+          // Створюємо порожнє повідомлення з полями content та thinking
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: "", thinking: "" },
+          ]);
           aiMessageStarted = true;
           setIsTyping(false);
         }
-        fullAiResponse += chunk;
+
+        fullAiResponse += content;
+        fullAiThinking += thinking;
+
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant") {
-            return [...prev.slice(0, -1), { ...last, content: fullAiResponse }];
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...last,
+                content: fullAiResponse,
+                thinking: fullAiThinking, // Оновлюємо роздуми в реальному часі
+              },
+            ];
           }
           return prev;
         });
