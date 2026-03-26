@@ -49,6 +49,9 @@ function App() {
     (state, action: { type: "add" | "delete" | "rename"; payload: any }) => {
       switch (action.type) {
         case "add":
+          if (state.some((c) => c.id === action.payload.id)) {
+            return state;
+          }
           return [action.payload, ...state];
         case "delete":
           return state.filter((c) => c.id !== action.payload);
@@ -144,29 +147,33 @@ function App() {
   // --- Handlers ---
 
   const handleCreateChat = useCallback(async () => {
-    const tempChat: Chat = {
-      id: crypto.randomUUID(),
-      title: "Нова розмова...",
-      model: currentModel,
-      persona: currentPersona,
-      createdAt: new Date().toISOString(),
-    };
+  const tempChat: Chat = {
+    id: crypto.randomUUID(), // Наш "Золотий ID"
+    title: "Нова розмова...",
+    model: currentModel,
+    persona: currentPersona,
+  };
 
-    startTransition(async () => {
-      setOptimisticChats({ type: "add", payload: tempChat });
-      try {
-        const newChat = await chatApi.createChat(
-          tempChat.title,
-          currentModel,
-          currentPersona,
-        );
-        setChats((prev) => [newChat, ...prev]);
-        setActiveChatId(newChat.id);
-      } catch (err) {
-        console.error(err);
-      }
-    });
-  }, [currentModel, currentPersona, setActiveChatId]);
+  startTransition(async () => {
+    // 1. Додаємо в оптимістичний стейт
+    setOptimisticChats({ type: "add", payload: tempChat });
+    
+    try {
+      const newChat = await chatApi.createChat(
+        tempChat.title,
+        currentModel,
+        currentPersona,
+        tempChat.id
+      );
+
+      // 3. Оновлюємо реальний стейт
+      setChats((prev) => [newChat, ...prev]);
+      setActiveChatId(newChat.id);
+    } catch (err) {
+      console.error("Помилка створення чату:", err);
+    }
+  });
+}, [currentModel, currentPersona, setActiveChatId]);
 
   const handleRenameChat = useCallback(async (id: string, title: string) => {
     startTransition(async () => {

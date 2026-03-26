@@ -11,12 +11,12 @@ export type OllamaChunk = {
   context?: number[];
 };
 
-export interface Chat {
+export type Chat = {
   id: string;
   title: string;
   model: string;
   persona: PersonaType;
-  createdAt: string; // DateTime -> ISO string
+  createdAt?: string;
 
   /**
    * Навігаційна властивість: Масив повідомлень.

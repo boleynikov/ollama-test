@@ -5,11 +5,11 @@ export const chatApi = {
   getChats: () => fetch(API_BASE).then((res) => res.json()),
 
   // Створити чат
-  createChat: (title: string, model: string, persona: string) =>
+  createChat: (title: string, model: string, persona: string, id: string) =>
     fetch(API_BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, model, persona }),
+      body: JSON.stringify({ id, title, model, persona }),
     }).then((res) => res.json()),
 
   // Отримати повідомлення
