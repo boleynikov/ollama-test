@@ -1,281 +1,195 @@
-import {
-  Box,
-  ThemeProvider,
-  Container,
-  AppBar,
-  Toolbar,
-  Typography,
-  alpha,
-} from "@mui/material";
-import {
-  useState,
-  useMemo,
-  useEffect,
-  useOptimistic,
-  useTransition,
-  useCallback,
-} from "react";
+import { AppBar, Box, Container, ThemeProvider, Toolbar, Typography, alpha } from "@mui/material";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo, useOptimistic, useState, useTransition } from "react";
 
-// Components
+import { chatApi } from "./api/chat";
+import { streamOllama } from "./api/ollama";
 import { Sidebar } from "./components/Sidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
 import { MessageInput } from "./components/chat/MessageInput";
-import { PersonaSelector } from "./components/chat/PersonaSelector";
 import { ModelSelector } from "./components/chat/ModelSelector";
+import { PersonaSelector } from "./components/chat/PersonaSelector";
 import { SettingsMenu } from "./components/chat/SettingsMenu";
-
-// Logic & Theme
+import { useLocalStorage } from "./hooks/useLocalStorage";
 import { getMacTheme, type ThemeColor } from "./theme";
 import { GlobalStyles } from "./theme/GlobalStyles";
-import { useLocalStorage } from "./hooks/useLocalStorage";
 import { PERSONAS, type Chat, type Message, type PersonaType } from "./types";
-import { chatApi } from "./api/chat";
-import { streamOllama } from "./api/ollama";
-
-/**
- * UI Designer: macOS Multi-Chat Workspace (React 19 Edition)
- * Впроваджено: Vibrancy Effects (AppBar & Footer), useOptimistic, Thinking Blocks
- */
 
 function App() {
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
 
-  // --- States ---
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // --- 1. React Query: Отримання даних ---
+  const { data: chats = [] } = useQuery<Chat[]>({
+    queryKey: ["chats"],
+    queryFn: chatApi.getChats,
+  });
 
+  const { data: availableModels = [] } = useQuery<string[]>({
+    queryKey: ["models"],
+    queryFn: chatApi.getLocalModels,
+  });
+
+  // --- 2. Локальні налаштування ---
+  const [themeMode, setThemeMode] = useLocalStorage<ThemeColor>("app-theme", "blue");
+  const [activeChatId, setActiveChatId] = useLocalStorage<string | null>("active-chat-id", null);
+  const [currentModel, setCurrentModel] = useLocalStorage<string>("app-model", "");
+  const [currentPersona, setCurrentPersona] = useState<PersonaType>("Thinking");
+
+  // Отримання повідомлень для активного чату
+  const { data: messages = [], isFetching: messagesLoading } = useQuery<Message[]>({
+    queryKey: ["messages", activeChatId],
+    queryFn: () => (activeChatId ? chatApi.getMessages(activeChatId) : Promise.resolve([])),
+    enabled: !!activeChatId,
+  });
+
+  // --- 3. Оптимістичні стани (React 19) ---
   const [optimisticChats, setOptimisticChats] = useOptimistic(
     chats,
     (state, action: { type: "add" | "delete" | "rename"; payload: any }) => {
       switch (action.type) {
         case "add":
-          if (state.some((c) => c.id === action.payload.id)) {
-            return state;
-          }
+          if (state.some((c) => c.id === action.payload.id)) return state;
           return [action.payload, ...state];
-        case "delete":
-          return state.filter((c) => c.id !== action.payload);
-        case "rename":
-          return state.map((c) =>
-            c.id === action.payload.id
-              ? { ...c, title: action.payload.title }
-              : c,
+        case "delete": return state.filter((c) => c.id !== action.payload);
+        case "rename": return state.map((c) => c.id === action.payload.id ? { ...c, title: action.payload.title } : c);
+        default: return state;
+      }
+    }
+  );
+
+  const [optimisticMessages, dispatchOptimisticMessages] = useOptimistic(
+    messages,
+    (state, action: { type: "add" | "update"; payload: Message }) => {
+      switch (action.type) {
+        case "add":
+          // Перевірка на дублікат, щоб не було "стрибків" при синхронізації з кешем
+          if (state.some((m) => m.id === action.payload.id)) return state;
+          return [...state, action.payload];
+
+        case "update":
+          return state.map((m) =>
+            m.id === action.payload.id ? action.payload : m
           );
+
         default:
           return state;
       }
-    },
-  );
-
-  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
-    messages,
-    (state, newMessage: Message) => {
-      if (state.some((m) => m.id === newMessage.id)) {
-        return state;
-      }
-      return [...state, newMessage];
-    },
-  );
-
-  const [themeMode, setThemeMode] = useLocalStorage<ThemeColor>(
-    "app-theme",
-    "blue",
-  );
-  const [currentModel, setCurrentModel] = useLocalStorage<string>(
-    "app-model",
-    "",
-  );
-  const [activeChatId, setActiveChatId] = useLocalStorage<string | null>(
-    "active-chat-id",
-    null,
-  );
-
-  const [loading, setLoading] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [currentPersona, setCurrentPersona] = useState<PersonaType>("Thinking");
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(true);
-
-  const theme = useMemo(() => getMacTheme(themeMode), [themeMode]);
-  const activePersonaConfig = useMemo(
-    () => PERSONAS[currentPersona],
-    [currentPersona],
-  );
-  const activeChat = useMemo(
-    () => optimisticChats.find((c) => c.id === activeChatId),
-    [optimisticChats, activeChatId],
-  );
-
-  // --- Effects ---
-
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const [loadedChats, models] = await Promise.all([
-          chatApi.getChats(),
-          chatApi.getLocalModels(),
-        ]);
-        setChats(loadedChats);
-        setAvailableModels(models);
-        if (
-          models.length > 0 &&
-          (!currentModel || !models.includes(currentModel))
-        ) {
-          setCurrentModel(models[0]);
-        }
-      } catch (err) {
-        console.error("Init error:", err);
-      } finally {
-        setModelsLoading(false);
-      }
-    };
-    init();
-  }, []);
-
-  useEffect(() => {
-    if (activeChatId) {
-      setLoading(true);
-      chatApi
-        .getMessages(activeChatId)
-        .then(setMessages)
-        .finally(() => setLoading(false));
-    } else {
-      setMessages([]);
     }
-  }, [activeChatId]);
+  );
 
-  // --- Handlers ---
+  const [isTyping, setIsTyping] = useState(false);
+  const theme = useMemo(() => getMacTheme(themeMode), [themeMode]);
+  const activeChat = useMemo(() => optimisticChats.find((c) => c.id === activeChatId), [optimisticChats, activeChatId]);
 
-  const handleCreateChat = useCallback(async () => {
+  // --- 4. Мутації (React Query) ---
+  const createMutation = useMutation({
+    mutationFn: (chat: Chat) => chatApi.createChat(chat.title, chat.model, chat.persona, chat.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chats"] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: chatApi.deleteChat,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chats"] }),
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) => chatApi.renameChat(id, title),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chats"] }),
+  });
+
+  // --- 5. Handlers ---
+  const handleCreateChat = useCallback(() => {
     const tempChat: Chat = {
-      id: crypto.randomUUID(), // Наш "Золотий ID"
+      id: crypto.randomUUID(),
       title: "Нова розмова...",
-      model: currentModel,
+      model: currentModel || availableModels[0],
       persona: currentPersona,
     };
 
     startTransition(async () => {
-      // 1. Додаємо в оптимістичний стейт
+      // 1. Показуємо оптимістично
       setOptimisticChats({ type: "add", payload: tempChat });
 
       try {
-        const newChat = await chatApi.createChat(
-          tempChat.title,
-          currentModel,
-          currentPersona,
-          tempChat.id
-        );
+        // 2. Виконуємо запит
+        await createMutation.mutateAsync(tempChat);
 
-        // 3. Оновлюємо реальний стейт
-        setChats((prev) => [newChat, ...prev]);
-        setActiveChatId(newChat.id);
+        // 3. Тільки після успішного оновлення кешу (в onSuccess) змінюємо ID активного чату
+        setActiveChatId(tempChat.id);
       } catch (err) {
-        console.error("Помилка створення чату:", err);
+        console.error("Помилка:", err);
       }
     });
-  }, [currentModel, currentPersona, setActiveChatId]);
+  }, [currentModel, availableModels, currentPersona, setActiveChatId, createMutation]);
 
-  const handleRenameChat = useCallback(async (id: string, title: string) => {
+  const handleDeleteChat = useCallback((id: string) => {
     startTransition(async () => {
-      setOptimisticChats({ type: "rename", payload: { id, title } });
-      try {
-        await chatApi.renameChat(id, title);
-        setChats((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, title } : c)),
-        );
-      } catch (err) {
-        console.error(err);
-      }
+      setOptimisticChats({ type: "delete", payload: id });
+      if (activeChatId === id) setActiveChatId(null);
+      await deleteMutation.mutateAsync(id);
     });
-  }, []);
-
-  const handleDeleteChat = useCallback(
-    async (id: string) => {
-      startTransition(async () => {
-        setOptimisticChats({ type: "delete", payload: id });
-        if (activeChatId === id) setActiveChatId(null);
-        try {
-          await chatApi.deleteChat(id);
-          setChats((prev) => prev.filter((c) => c.id !== id));
-        } catch (err) {
-          console.error(err);
-        }
-      });
-    },
-    [activeChatId, setActiveChatId],
-  );
+  }, [activeChatId]);
 
   const handleSend = async (text: string) => {
-    if (!text.trim() || !activeChatId || loading) return;
+    if (!text.trim() || !activeChatId) return;
 
-    setLoading(true);
+    // 1. ТЕРМІНОВО (Urgent): Індикатор друку
     setIsTyping(true);
 
-    // 1. Створюємо повідомлення користувача з ID
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: text,
-    };
+    const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text };
+    const aiMsgId = crypto.randomUUID();
 
+    // 2. ТРАНЗАКЦІЯ: Весь процес стрімінгу вважається одним переходом стану
     startTransition(async () => {
-      // 2. Миттєво додаємо в оптимістичний стейт
-      addOptimisticMessage(userMsg);
+      // Оптимістично додаємо повідомлення користувача
+      dispatchOptimisticMessages({ type: "add", payload: userMsg });
 
       let fullAiResponse = "";
       let fullAiThinking = "";
       let aiMessageStarted = false;
 
-      // Створюємо ID для майбутньої відповіді бота
-      const aiMsgId = crypto.randomUUID();
-
       try {
         await streamOllama(
-          [...messages, userMsg],
-          activePersonaConfig,
+          [...messages, userMsg], // Базуємось на актуальних даних із кешу
+          PERSONAS[currentPersona],
           currentModel,
           activeChatId,
           ({ content, thinking }) => {
             if (!aiMessageStarted) {
-              // ФІКС: Обов'язково додаємо id: aiMsgId сюди!
-              setMessages((prev) => [
-                ...prev,
-                userMsg, // Тепер воно в основному стейті, useOptimistic його відфільтрує
-                { id: aiMsgId, role: "assistant", content: "", thinking: "" },
-              ]);
+              setIsTyping(false);
+              // Додаємо порожній бабл асистента
+              dispatchOptimisticMessages({
+                type: "add",
+                payload: { id: aiMsgId, role: "assistant", content: "", thinking: "" },
+              });
               aiMessageStarted = true;
-              if (!thinking || thinking?.length === 0) {
-                setIsTyping(false);
-              }
             }
 
             fullAiResponse += content;
             fullAiThinking += thinking;
 
-            setMessages((prev) => {
-              const last = prev[prev.length - 1];
-              // Перевіряємо саме за ID, щоб точно оновити потрібне повідомлення
-              if (last?.role === "assistant" && last.id === aiMsgId) {
-                return [
-                  ...prev.slice(0, -1),
-                  {
-                    ...last,
-                    content: fullAiResponse,
-                    thinking: fullAiThinking,
-                  },
-                ];
-              }
-              return prev;
+            // Оновлюємо вміст бабла асистента в реальному часі
+            dispatchOptimisticMessages({
+              type: "update",
+              payload: {
+                id: aiMsgId,
+                role: "assistant",
+                content: fullAiResponse,
+                thinking: fullAiThinking
+              },
             });
           },
           () => {
-            setLoading(false);
+            // 3. ФІНАЛ: Коли стрім завершено, інвалідуємо кеш.
+            // React Query підтягне реальні дані, і useOptimistic плавно "відпустить" стейт.
+            queryClient.invalidateQueries({ queryKey: ["messages", activeChatId] });
             setIsTyping(false);
-          },
+          }
         );
       } catch (err) {
-        console.error("Stream error:", err);
-        setLoading(false);
+        console.error("Помилка стріму:", err);
+        setIsTyping(false);
       }
     });
   };
@@ -283,126 +197,53 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyles />
-      <Box
-        sx={{
-          display: "flex",
-          width: "100vw",
-          height: "100vh",
-          bgcolor: "background.default",
-          overflow: "hidden",
-        }}
-      >
+      <Box sx={{ display: "flex", width: "100vw", height: "100vh", bgcolor: "background.default", overflow: "hidden" }}>
         <Sidebar
           chats={optimisticChats}
           activeChatId={activeChatId}
           onSelectChat={setActiveChatId}
           onCreateChat={handleCreateChat}
-          onRenameChat={handleRenameChat}
+          onRenameChat={(id, title) => startTransition(() => {
+            setOptimisticChats({ type: "rename", payload: { id, title } });
+            renameMutation.mutate({ id, title });
+          })}
           onDeleteChat={handleDeleteChat}
         />
 
-        <Box
-          component="main"
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            minWidth: 0,
-            position: "relative",
-          }}
-        >
-          {/* Header Panel із Glassmorphism */}
-          <AppBar
-            position="sticky"
-            elevation={0}
-            sx={{
-              top: 0,
-              bgcolor: alpha(theme.palette.background.paper, 0.2),
-              borderColor: "divider",
-              zIndex: 1100,
-            }}
-          >
+        <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <AppBar position="sticky" elevation={0} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.2), backdropFilter: "blur(20px)" }}>
             <Toolbar sx={{ justifyContent: "space-between", px: 4 }}>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontSize: "0.95rem",
-                  fontWeight: 700,
-                  color: "text.primary",
-                }}
-              >
+              <Typography variant="h6" sx={{ fontSize: "0.95rem", fontWeight: 700 }}>
                 {activeChat?.title || "Оберіть чат"}
-                {isPending && (
-                  <Typography variant="caption" sx={{ ml: 2, opacity: 0.5 }}>
-                    Збереження...
-                  </Typography>
-                )}
               </Typography>
-
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <ModelSelector
-                  value={currentModel}
-                  models={availableModels}
-                  onChange={setCurrentModel}
-                  disabled={loading}
-                  loading={modelsLoading}
-                />
-                <SettingsMenu
-                  currentTheme={themeMode}
-                  onThemeChange={setThemeMode}
-                />
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <ModelSelector value={currentModel} models={availableModels} onChange={setCurrentModel} disabled={isPending || messagesLoading} />
+                <SettingsMenu currentTheme={themeMode} onThemeChange={setThemeMode} />
               </Box>
             </Toolbar>
           </AppBar>
 
           {activeChatId ? (
-            <Container
-              maxWidth="lg"
-              disableGutters
-              sx={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                minHeight: 0,
-                overflowY: "auto",
-              }}
-            >
+            <Container maxWidth="lg" disableGutters sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflowY: "auto", }}>
               <ChatWindow messages={optimisticMessages} isTyping={isTyping} />
-
-              {/* Footer Panel із Glassmorphism */}
               <Box
                 component="footer"
                 sx={{
+                  p: 2,
+                  bgcolor: alpha(theme.palette.background.paper, 0.4),
+                  borderRadius: '26px',
+                  backdropFilter: "blur(3px)",
                   position: "sticky",
                   bottom: 0,
                   zIndex: 1100,
-                  bgcolor: alpha(theme.palette.background.paper, 0.4),
-                  backdropFilter: "blur(3px)",
-
-                  borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-                }}
-              >
-                <PersonaSelector
-                  selected={currentPersona}
-                  onSelect={setCurrentPersona}
-                  disabled={loading}
-                />
-                <MessageInput onSend={handleSend} disabled={loading} />
+                }}>
+                <PersonaSelector selected={currentPersona} onSelect={setCurrentPersona} disabled={isPending || messagesLoading} />
+                <MessageInput onSend={handleSend} disabled={isTyping || isPending || messagesLoading} />
               </Box>
             </Container>
           ) : (
-            <Box
-              sx={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: 0.5,
-              }}
-            >
-              <Typography variant="body1">
-                Створіть або оберіть чат, щоб почати
-              </Typography>
+            <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
+              <Typography>Створіть або оберіть розмову</Typography>
             </Box>
           )}
         </Box>
