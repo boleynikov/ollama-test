@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.AI;
-using WebApplication1;
+using WebApplication1.services;
+using WebApplication1.services.interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +18,9 @@ builder.Services.AddHttpClient("Ollama", client =>
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IOllamaService, OllamaService>();
 
 builder.Services.AddCors(options =>
 {
