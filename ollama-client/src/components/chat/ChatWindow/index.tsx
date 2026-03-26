@@ -19,7 +19,8 @@ export const ChatWindow = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const lastScrollTop = useRef(0); // Для відстеження напрямку руху
-
+  console.log('isTyping', isTyping);
+  
   /**
    * UI Designer Logic: Детектор наміру користувача
    */

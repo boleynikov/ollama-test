@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.models.entities;
 
-namespace WebApplication1.Controllers;
+namespace WebApplication1.controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -31,7 +31,11 @@ public class ChatsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ChatSession>> CreateChat([FromBody] ChatSession session)
     {
-        session.Id = Guid.NewGuid();
+        if (session.Id == Guid.Empty) 
+        {
+            session.Id = Guid.NewGuid();
+        }
+        
         session.CreatedAt = DateTime.UtcNow;
         
         _context.ChatSessions.Add(session);

@@ -1,4 +1,4 @@
-﻿namespace WebApplication1.Models.Dto.Ollama;
+﻿namespace WebApplication1.models.dto.ollama;
 
 using System.Text.Json.Serialization;
 

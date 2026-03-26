@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using WebApplication1.models.entities;
 using WebApplication1.models.dto.ollama;
 
-namespace WebApplication1.Controllers;
+namespace WebApplication1.controllers;
 
 [ApiController]
 [Route("api/[controller]")]

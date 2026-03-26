@@ -147,33 +147,33 @@ function App() {
   // --- Handlers ---
 
   const handleCreateChat = useCallback(async () => {
-  const tempChat: Chat = {
-    id: crypto.randomUUID(), // Наш "Золотий ID"
-    title: "Нова розмова...",
-    model: currentModel,
-    persona: currentPersona,
-  };
+    const tempChat: Chat = {
+      id: crypto.randomUUID(), // Наш "Золотий ID"
+      title: "Нова розмова...",
+      model: currentModel,
+      persona: currentPersona,
+    };
 
-  startTransition(async () => {
-    // 1. Додаємо в оптимістичний стейт
-    setOptimisticChats({ type: "add", payload: tempChat });
-    
-    try {
-      const newChat = await chatApi.createChat(
-        tempChat.title,
-        currentModel,
-        currentPersona,
-        tempChat.id
-      );
+    startTransition(async () => {
+      // 1. Додаємо в оптимістичний стейт
+      setOptimisticChats({ type: "add", payload: tempChat });
 
-      // 3. Оновлюємо реальний стейт
-      setChats((prev) => [newChat, ...prev]);
-      setActiveChatId(newChat.id);
-    } catch (err) {
-      console.error("Помилка створення чату:", err);
-    }
-  });
-}, [currentModel, currentPersona, setActiveChatId]);
+      try {
+        const newChat = await chatApi.createChat(
+          tempChat.title,
+          currentModel,
+          currentPersona,
+          tempChat.id
+        );
+
+        // 3. Оновлюємо реальний стейт
+        setChats((prev) => [newChat, ...prev]);
+        setActiveChatId(newChat.id);
+      } catch (err) {
+        console.error("Помилка створення чату:", err);
+      }
+    });
+  }, [currentModel, currentPersona, setActiveChatId]);
 
   const handleRenameChat = useCallback(async (id: string, title: string) => {
     startTransition(async () => {
@@ -208,6 +208,9 @@ function App() {
   const handleSend = async (text: string) => {
     if (!text.trim() || !activeChatId || loading) return;
 
+    setLoading(true);
+    setIsTyping(true);
+
     // 1. Створюємо повідомлення користувача з ID
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -219,8 +222,6 @@ function App() {
       // 2. Миттєво додаємо в оптимістичний стейт
       addOptimisticMessage(userMsg);
 
-      setLoading(true);
-      setIsTyping(true);
       let fullAiResponse = "";
       let fullAiThinking = "";
       let aiMessageStarted = false;
@@ -243,7 +244,9 @@ function App() {
                 { id: aiMsgId, role: "assistant", content: "", thinking: "" },
               ]);
               aiMessageStarted = true;
-              setIsTyping(false);
+              if (!thinking || thinking?.length === 0) {
+                setIsTyping(false);
+              }
             }
 
             fullAiResponse += content;
@@ -265,7 +268,10 @@ function App() {
               return prev;
             });
           },
-          () => setLoading(false),
+          () => {
+            setLoading(false);
+            setIsTyping(false);
+          },
         );
       } catch (err) {
         console.error("Stream error:", err);
